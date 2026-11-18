@@ -1,0 +1,12 @@
+# Scenario "raw": no scrubbing, no sampling. What leaks, and how much there is.
+processors:
+  batch: {timeout: 200ms}
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull: {exporter: {prometheus: {host: 127.0.0.1, port: "${env:COLLECTOR_METRICS_PORT}"}}}
+  pipelines:
+    traces: {receivers: [otlp], processors: [batch], exporters: [file/traces]}
+    logs: {receivers: [otlp], processors: [batch], exporters: [file/logs]}
+    metrics: {receivers: [otlp], processors: [batch], exporters: [file/metrics]}

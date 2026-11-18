@@ -22,7 +22,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0" // must match the SDK's default resource, or Merge fails
 )
 
 // Setup starts the three signal pipelines for a service. HEAD_SAMPLE_RATIO
@@ -31,7 +31,7 @@ import (
 func Setup(ctx context.Context, service string) (func(context.Context) error, error) {
 	res, err := resource.Merge(resource.Default(), resource.NewWithAttributes(semconv.SchemaURL,
 		semconv.ServiceName(service), semconv.ServiceVersion("1.0.0"),
-		semconv.DeploymentEnvironmentName("lab")))
+		semconv.DeploymentEnvironmentNameKey.String("lab")))
 	if err != nil {
 		return nil, err
 	}

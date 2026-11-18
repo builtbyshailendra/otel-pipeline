@@ -30,3 +30,24 @@ What broke: the test looked for a server span named `POST /checkout`; the curren
 Tests use the collector's own helpers (`processortest`, `consumertest` sinks): 11 redaction cases including two Luhn-failing numbers that must survive, a full leaky trace (resource, nested map, status message, exception event, a mixed-case header key, an allow-listed ID), structured log bodies, and config validation.
 
 **Performance.** Benchmark: a batch of 1,000 spans that *all* contain secrets (the worst case). First version: **35 ms** per batch (157,000 allocations): every string went through five regular expressions. Adding a cheap check before each one (no `@` → can't be an email; fewer than 13 digits → can't be a card) brought it to **13.5 ms** (61,000 allocations), 2.6× faster. Clean strings, the normal case, now skip the regular expressions entirely.
+
+### Step 3: a custom collector, and the experiment
+
+**The collector.** `collector/builder-config.yaml` lists exactly seven components (OTLP receiver; memory limiter, batch, tail sampling and this repo's `scrub` processors; debug and file exporters), and the OpenTelemetry Collector Builder (`go tool builder`, v0.165.0, pinned as a Go tool) generates and compiles them into one binary: 45.7 MB, about 4.5 minutes to generate, fetch and compile here. `collector/*.yaml` are the configs; the collector merges `common.yaml` with one scenario file.
+
+**The experiment** (`e2e/e2e_test.go`): the real collector, service and load generator as separate processes, 2,000 checkouts per scenario, then the collector's output files are parsed and checked against what the load generator sent:
+
+| Scenario | Traces kept | Spans | Trace data | Errors kept | Slow (≥ 500 ms) kept | Others kept | Secrets in the output |
+|---|---|---|---|---|---|---|---|
+| **raw**: no scrubbing, no sampling | 2,000 | 11,898 | 6,000 KB | 102 / 102 | 34 / 34 | 1,864 / 1,864 | **10,306**: 2,204 card numbers, 4,102 emails, 2,000 bearer JWTs, 2,000 auth-header keys |
+| **head**: scrub + 10% head sampling in the services | 188 | 1,117 | 565 KB | **11 / 102** | **2 / 34** | 175 / 1,864 | 0 |
+| **tail**: scrub + tail sampling in the collector | 330 | 1,878 | 1,424 KB | **102 / 102** | **34 / 34** | 194 / 1,864 (10.4%) | 0 |
+
+What it shows:
+- **Head sampling throws away what you need most.** It decides when a trace starts, so it kept about 1 in 10 of everything: 11 of the 102 failed checkouts and 2 of the 34 slow ones.
+- **Tail sampling keeps every error and every slow trace** and still cuts trace volume by 76% (6,000 → 1,424 KB). It's bigger than head sampling's output because the traces it keeps on purpose are the long ones, with exception events.
+- **Nothing sensitive survived scrubbing**: 0 of 10,306. The processor's own metrics account for it: 2,102 card numbers in traces (attributes and exception events), 102 in logs, 4,102 emails; the 2,000 Authorization headers were dropped by key.
+- **Sampling traces doesn't reduce logs**: all 2,103 log records arrived in every scenario. Log volume needs its own policy (levels, or keeping logs only for sampled traces).
+
+What broke:
+1. **The services wouldn't start**: `conflicting Schema URL: .../1.43.0 and .../1.37.0`. The SDK's default resource uses semantic conventions 1.43.0; my code imported the 1.37.0 package, and merging resources with different schema URLs is an error. The unit test hadn't caught it because it never ran `telemetry.Setup`; the end-to-end run did. Fixed by importing the matching version; in 1.43, `deployment.environment.name` is an enumerated key, so the helper function changed too.

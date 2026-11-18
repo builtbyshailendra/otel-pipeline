@@ -1,0 +1,29 @@
+# Scenario "tail": the services send everything; the collector waits until a
+# trace is complete, then keeps every error, every slow trace, and 1 in 10 of
+# the rest. Scrubbing runs first, so nothing sensitive sits in its buffers.
+processors:
+  memory_limiter: {check_interval: 1s, limit_mib: 512}
+  scrub: {}
+  tail_sampling:
+    decision_wait: 2s        # how long to wait for a trace's last span
+    num_traces: 100000       # traces held in memory while waiting
+    policies:                # a trace is kept if ANY policy says so
+      - name: keep-errors
+        type: status_code
+        status_code: {status_codes: [ERROR]}
+      - name: keep-slow
+        type: latency
+        latency: {threshold_ms: 500}
+      - name: one-in-ten-of-the-rest
+        type: probabilistic
+        probabilistic: {sampling_percentage: 10}
+  batch: {timeout: 200ms}
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull: {exporter: {prometheus: {host: 127.0.0.1, port: "${env:COLLECTOR_METRICS_PORT}"}}}
+  pipelines:
+    traces: {receivers: [otlp], processors: [memory_limiter, scrub, tail_sampling, batch], exporters: [file/traces]}
+    logs: {receivers: [otlp], processors: [memory_limiter, scrub, batch], exporters: [file/logs]}
+    metrics: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [file/metrics]}

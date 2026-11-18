@@ -1,0 +1,16 @@
+# Scenario "head": scrubbing in the collector; sampling decided in the
+# services at the start of each trace (HEAD_SAMPLE_RATIO=0.1), before anyone
+# knows whether it will fail.
+processors:
+  memory_limiter: {check_interval: 1s, limit_mib: 512}
+  scrub: {}
+  batch: {timeout: 200ms}
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull: {exporter: {prometheus: {host: 127.0.0.1, port: "${env:COLLECTOR_METRICS_PORT}"}}}
+  pipelines:
+    traces: {receivers: [otlp], processors: [memory_limiter, scrub, batch], exporters: [file/traces]}
+    logs: {receivers: [otlp], processors: [memory_limiter, scrub, batch], exporters: [file/logs]}
+    metrics: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [file/metrics]}

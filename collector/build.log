@@ -1,0 +1,7 @@
+2026-11-18T22:29:05.988+0530	INFO	internal/command.go:97	OpenTelemetry Collector Builder	{"version": "v0.165.0"}
+2026-11-18T22:29:05.989+0530	INFO	internal/command.go:102	Using config file	{"path": "collector/builder-config.yaml"}
+2026-11-18T22:29:05.990+0530	INFO	builder/config.go:292	Using go	{"go-executable": "D:\\tools\\go\\bin\\go.exe"}
+2026-11-18T22:29:05.995+0530	INFO	builder/main.go:110	Sources created	{"path": "./collector/_build"}
+2026-11-18T22:30:47.136+0530	INFO	builder/main.go:231	Getting go modules
+2026-11-18T22:31:29.328+0530	INFO	builder/main.go:121	Compiling
+2026-11-18T22:33:24.653+0530	INFO	builder/main.go:153	Compiled	{"binary": "./collector/_build/otelcol-pipeline.exe"}

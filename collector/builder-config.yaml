@@ -1,0 +1,27 @@
+# The collector distribution for this project, built with the OpenTelemetry
+# Collector Builder (ocb):  go tool builder --config collector/builder-config.yaml
+# Only what's listed here is compiled in: a smaller binary and a smaller
+# attack surface than the all-in-one "contrib" distribution.
+dist:
+  name: otelcol-pipeline
+  description: OTLP in, scrub secrets, tail sampling, files out
+  output_path: ./collector/_build
+  version: 0.1.0
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.165.0
+
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.165.0
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.165.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.165.1
+  - gomod: github.com/builtbyshailendra/otel-pipeline/scrubprocessor v0.0.0
+    path: ./scrubprocessor   # this repo's own processor
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.165.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.165.1
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.71.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.71.0
