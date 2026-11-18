@@ -1,8 +1,39 @@
 # otel-pipeline
 
-Telemetry you can trust and afford: an instrumented service, your own OpenTelemetry Collector, a processor that strips secrets and personal data before anything leaves, and tail-based sampling that keeps every error while dropping most of the rest.
+Telemetry you can trust and afford. An instrumented Go service sends traces, metrics and logs to **its own OpenTelemetry Collector**, built with the official builder and including a **processor I wrote that strips secrets and personal data**. **Tail-based sampling** in the collector keeps every failed or slow request while dropping most of the rest.
 
-Status: built step by step, locally. Not published.
+Go 1.27 · OpenTelemetry Go SDK 1.47 · Collector v0.165 (core v1.71) · contrib tail sampling and file exporter. Personal learning project, built pairing with Claude Code. Everything ran on this laptop as real processes; no observability backend is involved (the collector writes files).
+
+## Results (2,000 checkouts per scenario)
+
+| Scenario | Errors kept | Slow kept | Trace data | Secrets reaching the output |
+|---|---|---|---|---|
+| raw (no scrubbing, no sampling) | 102 / 102 | 34 / 34 | 6,000 KB | 10,306 |
+| head sampling 10% + scrub | **11 / 102** | **2 / 34** | 565 KB | 0 |
+| tail sampling + scrub | **102 / 102** | **34 / 34** | 1,424 KB (−76%) | 0 |
+
+Other numbers:
+- The scrub processor handles 1,000 all-leaky spans in 13.5 ms, down from 35 ms before cheap pre-checks.
+- The custom collector has seven components in a 45.7 MB binary.
+
+## How it fits together
+
+```text
+loadgen ──traceparent──► checkout ──┐   (OTel Go SDK: traces, metrics, logs; OTLP/HTTP)
+   └────────────────────────────────┴──► otelcol-pipeline (built with ocb)
+                                            otlp receiver
+                                            → memory_limiter → scrub → tail_sampling → batch
+                                            → file exporter (traces.jsonl, logs.jsonl, metrics.jsonl)
+                                            own metrics on :COLLECTOR_METRICS_PORT (scrub_redactions, ...)
+```
+
+## Try it
+
+```bash
+go tool builder --config collector/builder-config.yaml   # builds collector/_build/otelcol-pipeline
+go test ./... && (cd scrubprocessor && go test ./...)     # unit tests
+go test ./e2e -v                                          # the three scenarios, ~40 s
+```
 
 ## Build log
 
@@ -51,3 +82,7 @@ What it shows:
 
 What broke:
 1. **The services wouldn't start**: `conflicting Schema URL: .../1.43.0 and .../1.37.0`. The SDK's default resource uses semantic conventions 1.43.0; my code imported the 1.37.0 package, and merging resources with different schema URLs is an error. The unit test hadn't caught it because it never ran `telemetry.Setup`; the end-to-end run did. Fixed by importing the matching version; in 1.43, `deployment.environment.name` is an enumerated key, so the helper function changed too.
+
+### Step 4: docs
+
+This README's summary, `LEARN.md`, and an interview brief. Where it stands: local commits only; unit tests, processor tests and the end-to-end experiment pass. Not published, no CI.

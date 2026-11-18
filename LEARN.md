@@ -49,7 +49,7 @@ Rule of thumb: head-sample for volume when every trace is equally interesting; t
 
 ## 5. Explain it without notes
 
-(Numbers are in README.md once the experiment runs.)
+Numbers to anchor your answers: head sampling kept 11 of 102 failed checkouts, tail sampling all 102 (and all 34 slow ones) with 76% less trace data; 0 of 10,306 leaked values reached the output; the processor went from 35 ms to 13.5 ms per 1,000 leaky spans.
 
 1. Walk a request from `loadgen` through `checkout` to the collector and out to a file. Where does the trace ID travel?
 2. Why scrub in the collector instead of fixing each service? Why do both anyway?
@@ -61,3 +61,10 @@ Rule of thumb: head-sample for volume when every trace is equally interesting; t
 8. What's an exemplar, and how would you use one during an incident?
 9. Why build a custom collector with the builder instead of using the contrib distribution?
 10. What would you alert on in the collector's own metrics?
+
+## 6. Your turn
+
+1. Add a detector for Indian PAN or Aadhaar-like numbers, with a checksum where one exists, and tests.
+2. Keep logs only for sampled traces: after tail sampling, drop log records whose trace wasn't kept. Where in the pipeline can that happen, and what does it cost?
+3. Run two collectors behind a `loadbalancing` exporter routing by trace ID, and show tail sampling still keeps every error.
+4. Export to a real backend (Jaeger or Grafana Tempo in a container) and find a slow trace from a histogram exemplar.
