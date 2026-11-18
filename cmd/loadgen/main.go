@@ -22,6 +22,11 @@ import (
 	"github.com/builtbyshailendra/otel-pipeline/internal/telemetry"
 )
 
+type sent struct {
+	Status int   `json:"status"`
+	Ms     int64 `json:"ms"`
+}
+
 func main() {
 	url := flag.String("url", "http://127.0.0.1:8099/checkout", "checkout endpoint")
 	n := flag.Int("n", 1000, "requests")
@@ -37,13 +42,14 @@ func main() {
 	tracer := otel.Tracer("loadgen")
 
 	var ok, failed atomic.Int64
-	var traceIDs sync.Map // trace id -> HTTP status, so tests can check what the collector kept
+	var traceIDs sync.Map // trace id -> what happened, so tests can check what the collector kept
 	jobs := make(chan int)
 	var wg sync.WaitGroup
 	start := time.Now()
 	for range *c {
 		wg.Go(func() {
 			for i := range jobs {
+				began := time.Now()
 				rctx, span := tracer.Start(ctx, "buy")
 				req, _ := http.NewRequestWithContext(rctx, http.MethodPost, fmt.Sprintf("%s?user=user%d", *url, i), nil)
 				resp, err := client.Do(req)
@@ -53,7 +59,7 @@ func main() {
 					resp.Body.Close()
 				}
 				span.End()
-				traceIDs.Store(span.SpanContext().TraceID().String(), status)
+				traceIDs.Store(span.SpanContext().TraceID().String(), sent{Status: status, Ms: time.Since(began).Milliseconds()})
 				if status == http.StatusOK {
 					ok.Add(1)
 				} else {
@@ -76,8 +82,8 @@ func main() {
 	}
 	summary := map[string]any{"requests": *n, "ok": ok.Load(), "failed": failed.Load(), "seconds": took.Seconds()}
 	if path := os.Getenv("LOADGEN_TRACES"); path != "" {
-		m := map[string]int{}
-		traceIDs.Range(func(k, v any) bool { m[k.(string)] = v.(int); return true })
+		m := map[string]sent{}
+		traceIDs.Range(func(k, v any) bool { m[k.(string)] = v.(sent); return true })
 		b, _ := json.Marshal(m)
 		_ = os.WriteFile(path, b, 0o600)
 	}

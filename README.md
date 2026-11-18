@@ -15,3 +15,18 @@ Status: built step by step, locally. Not published.
 Test (in-memory exporters): 200 checkouts produce 200 complete traces; every HTTP failure is a trace marked as an error with no receipt span; slow ones carry a "provider retried" event; the latency histogram carries exemplars (8 here) linking buckets to example traces.
 
 What broke: the test looked for a server span named `POST /checkout`; the current HTTP conventions name it `{method} {route}`, and just `POST` when no route is known (the test has no router). The test now finds the server span by its kind.
+
+### Step 2: a collector processor that scrubs secrets and personal data
+
+`scrubprocessor/` is an OpenTelemetry Collector component (its own Go module, built on the collector's `processor`, `processorhelper` and `pdata` packages, v1.71/v0.165):
+
+- **Drop** attribute keys that must never leave (Authorization and cookie headers, passwords), matched case-insensitively.
+- **Mask** values in any string, nested map or list: card numbers (13–19 digits, **only if they pass the Luhn checksum**, so order numbers and timestamps survive), emails, bearer tokens, JWTs, AWS access keys, each replaced with `[REDACTED:<kind>]`.
+- Covers resource, span, span-event and span-link attributes, span status messages, log attributes, and log bodies (plain or structured).
+- `allow_keys` exempts known-safe fields; an unknown detector name fails config validation at startup instead of silently scrubbing nothing.
+- Counts what it does on the collector's own metrics (`scrub_redactions{detector,signal}`, `scrub_dropped_attributes`).
+- Declares `MutatesData`, so the collector gives it its own copy when a pipeline fans out.
+
+Tests use the collector's own helpers (`processortest`, `consumertest` sinks): 11 redaction cases including two Luhn-failing numbers that must survive, a full leaky trace (resource, nested map, status message, exception event, a mixed-case header key, an allow-listed ID), structured log bodies, and config validation.
+
+**Performance.** Benchmark: a batch of 1,000 spans that *all* contain secrets (the worst case). First version: **35 ms** per batch (157,000 allocations): every string went through five regular expressions. Adding a cheap check before each one (no `@` → can't be an email; fewer than 13 digits → can't be a card) brought it to **13.5 ms** (61,000 allocations), 2.6× faster. Clean strings, the normal case, now skip the regular expressions entirely.
