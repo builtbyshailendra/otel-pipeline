@@ -3,3 +3,4 @@
 *.test
 /collector/_build/
 /out/
+/collector/build.log
