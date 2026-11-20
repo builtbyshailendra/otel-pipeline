@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: unit tests
+        run: |
+          go vet ./...
+          go test -count=1 $(go list ./... | grep -v /e2e)
+          (cd scrubprocessor && go test -count=1 ./...)
+      - name: build the custom collector (OpenTelemetry Collector Builder)
+        run: go tool builder --config collector/builder-config.yaml
+      - name: end to end (head vs tail sampling, scrubbing, three scenarios)
+        run: go test -count=1 -v -timeout 15m ./e2e

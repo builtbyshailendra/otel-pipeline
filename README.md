@@ -1,5 +1,7 @@
 # otel-pipeline
 
+[![ci](https://github.com/builtbyshailendra/otel-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/builtbyshailendra/otel-pipeline/actions/workflows/ci.yml)
+
 Telemetry you can trust and afford. An instrumented Go service sends traces, metrics and logs to **its own OpenTelemetry Collector**, built with the official builder and including a **processor I wrote that strips secrets and personal data**. **Tail-based sampling** in the collector keeps every failed or slow request while dropping most of the rest.
 
 Go 1.27 · OpenTelemetry Go SDK 1.47 · Collector v0.165 (core v1.71) · contrib tail sampling and file exporter. Personal learning project, built pairing with Claude Code. Everything ran on this laptop as real processes; no observability backend is involved (the collector writes files).
@@ -85,4 +87,4 @@ What broke:
 
 ### Step 4: docs
 
-This README's summary, `LEARN.md`, and an interview brief. Where it stands: local commits only; unit tests, processor tests and the end-to-end experiment pass. Not published, no CI.
+This README's summary, `LEARN.md`, and an interview brief. Where it stands: unit tests, processor tests and the end-to-end experiment pass, locally and in CI (badge above; CI builds the collector too). Published 20 Nov 2026.
